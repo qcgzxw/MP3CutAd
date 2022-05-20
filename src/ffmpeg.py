@@ -1,6 +1,10 @@
-from .types import AdList, AudioList, StreamList
+from typing import List, Tuple
 
 import ffmpeg
+
+
+StreamList = List[ffmpeg.Stream]
+AdList = List[Tuple[float, float]]
 
 
 class FFMpeg:
@@ -9,17 +13,20 @@ class FFMpeg:
         self.input = ffmpeg.input(filename)
         self.info = ffmpeg.probe(filename)
 
-    def audio2wav(self, output: str) -> None:
-        self.input.output(output, ac="1", ar="22050", f="wav").global_args('-y', '-loglevel', '0').run()
+    def get_format_info(self):
+        return self.info['format']
+
+    def audio2wav(self, output: str, ar="22050") -> None:
+        self.input.output(output, ac="1", ar=ar, f="wav").global_args('-y', '-loglevel', '0').run()
 
     def split(self, output: str, start: float, end: float) -> None:
         # 禁止-c copy 解决时长不准确问题
         if end <= start:
             return
-        self.input.output(output, ss=str(start), to=str(end)) \
+        self.input.output(output, ss=str(start), to=str(end), c="copy", f="wav") \
             .global_args('-y', '-loglevel', '0').run()
 
-    def concat(self, audio_list: AudioList, output: str) -> None:
+    def concat(self, audio_list: AdList, output: str) -> None:
         stream_list: StreamList = []
         for index in range(len(audio_list)):
             start, end = audio_list[index]
@@ -30,7 +37,7 @@ class FFMpeg:
     def cut_ad(self, ad_list: AdList, output: str) -> None:
         if len(ad_list) == 0:
             return
-        audio_list: AudioList = []
+        audio_list: AdList = []
         if ad_list[0][0] > 0:
             audio_list.append((0, ad_list[0][0]))
         duration = float(self.info['format']['duration'])
